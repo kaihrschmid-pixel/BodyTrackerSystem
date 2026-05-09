@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Lokale Daten (niemals committen)
+data/
+*.db
+*_token.json
+.env
+.env.local
+
+# Artefakte
+files.zip
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

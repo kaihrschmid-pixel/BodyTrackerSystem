@@ -1,0 +1,73 @@
+# kits/starter/config.yaml
+# ========================
+# Starter Kit — works with any scale + any USB webcam
+# Hardware cost: ~0 € (use what you have) to ~80 € (cheap BLE scale + webcam)
+#
+# Recommended hardware:
+#   Scale:  Any Bluetooth BLE scale (Xiaomi Mi Body Composition Scale 2, ~25 €)
+#           OR just manual entry — no hardware required to start
+#   Camera: Any USB webcam (Logitech C270, ~30 €) or built-in laptop camera
+#   Host:   Any Linux machine, Raspberry Pi 4, or Windows/macOS
+
+profile:
+  name: "Default"
+  height_cm: 175          # update this
+  sex: "male"             # "male" | "female" | "other"
+  birthdate: "1990-01-01" # used for BMI and metabolic age context
+  timezone: "Europe/Berlin"
+
+hardware:
+  scale:
+    adapter: "manual"     # start here — no hardware needed
+    # Switch to "ble" once you have a BLE scale:
+    # adapter: "ble"
+    # device_name: "MI Scale"  # Bluetooth device name
+
+  camera:
+    adapter: "v4l2"           # USB webcam on Linux
+    device: "/dev/video0"     # adjust if needed (check: ls /dev/video*)
+    resolution: [1920, 1080]
+    stabilisation_delay_s: 3  # seconds after scale trigger before capture
+    # adapter: "mock"           # use "mock" for testing without camera
+
+storage:
+  db_path: "data/tracker.db"
+  photos_path: "data/photos"
+  exports_path: "data/exports"
+
+scheduler:
+  # Optionally trigger a reminder at a fixed time if no scale event received
+  daily_reminder_time: "07:30"
+  timezone: "Europe/Berlin"
+
+wearables:
+  # All disabled by default in starter kit
+  # Enable and configure as needed:
+  oura:
+    enabled: false
+    personal_access_token: "YOUR_TOKEN"
+    # Get token: https://cloud.ouraring.com/personal-access-tokens
+
+  garmin:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+
+  fitbit:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+
+ai:
+  enabled: false  # enable once you have an API key
+  provider: "anthropic"
+  api_key: "YOUR_API_KEY"
+  # What to analyse per session:
+  analyse_photo: false      # requires enabled: true
+  analyse_trends: false     # weekly/monthly trend summary
+  context_days: 30          # how many past days to include in trend analysis
+
+ui:
+  host: "127.0.0.1"
+  port: 8000
+  # Open http://localhost:8000 after starting the server

@@ -1,0 +1,110 @@
+# kits/standard/config.yaml
+# ==========================
+# Standard Kit — Withings Body Scan + Raspberry Pi Camera Module 3
+#
+# This kit provides clinical-grade body composition analysis combined with
+# automated silhouette photography on a compact Raspberry Pi setup.
+#
+# Recommended hardware (~650–800 €):
+#   Scale:   Withings Body Scan                   (~400 €)
+#            → 14-electrode segmental BIA + ECG + nerve health score
+#   Camera:  Raspberry Pi Camera Module 3 NoIR    (~25 €)
+#            → 12 MP, autofocus, excellent low-light
+#   Host:    Raspberry Pi 4 Model B (4 GB RAM)    (~60 €) or Pi 5 (~80 €)
+#   Stand:   Phone/tablet mount on a tripod       (~20 €)
+#            → Position 2–3 m in front of the scale, at ~1 m height
+#
+# Setup:
+#   1. Enable camera in raspi-config → Interface Options → Camera
+#   2. pip install body-tracker[picamera2]
+#   3. Complete Withings OAuth: body-tracker auth withings
+#   4. body-tracker run --config kits/standard/config.yaml
+
+profile:
+  name: "Default"
+  height_cm: 175          # ← update this
+  sex: "male"             # "male" | "female" | "other"
+  birthdate: "1990-01-01" # ← update this (used for metabolic age context)
+  timezone: "Europe/Berlin"
+
+hardware:
+  scale:
+    adapter: "withings"
+    client_id: "YOUR_WITHINGS_CLIENT_ID"         # ← from developer.withings.com
+    client_secret: "YOUR_WITHINGS_CLIENT_SECRET"
+    access_token: ""          # populated automatically after: body-tracker auth withings
+    refresh_token: ""         # populated automatically
+    token_path: "data/withings_token.json"
+
+  camera:
+    adapter: "picamera2"
+    photos_path: "data/photos"
+    resolution: [2304, 1296]    # Camera Module 3 native 16:9
+    stabilisation_delay_s: 3    # seconds after scale trigger before capture
+    camera_num: 0
+    hflip: false
+    vflip: false
+
+storage:
+  db_path: "data/tracker.db"
+  photos_path: "data/photos"
+  exports_path: "data/exports"
+
+scheduler:
+  daily_reminder_time: "07:30"  # reminder if no session recorded yet
+  timezone: "Europe/Berlin"
+
+imaging:
+  enabled: true
+  segmentation_model: 1         # 1 = landscape model (better for full-body)
+  min_detection_confidence: 0.5
+  output_dir: "data/silhouettes"
+
+wearables:
+  # Add your wearable(s) below. All disabled by default.
+  oura:
+    enabled: false
+    personal_access_token: "YOUR_TOKEN"
+    # https://cloud.ouraring.com/personal-access-tokens
+
+  garmin:
+    enabled: false
+    consumer_key: ""
+    consumer_secret: ""
+    access_token: ""
+    access_token_secret: ""
+
+  fitbit:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    token_path: "data/fitbit_token.json"
+
+  whoop:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    token_path: "data/whoop_token.json"
+
+ai:
+  enabled: false              # set true once you have an Anthropic API key
+  provider: "anthropic"
+  model: "claude-opus-4-5"
+  api_key: "YOUR_ANTHROPIC_API_KEY"
+  analyse_photo: true         # include silhouette in AI prompt
+  analyse_trends: true        # weekly/monthly trend summaries
+  context_days: 30
+
+ui:
+  host: "127.0.0.1"
+  port: 8000
+  # Open http://localhost:8000 after: body-tracker serve --config kits/standard/config.yaml
+
+# ---------------------------------------------------------------------------
+# Expected metrics from Withings Body Scan
+# ---------------------------------------------------------------------------
+# weight_kg, body_fat_pct, muscle_mass_kg, bone_mass_kg, water_pct
+# visceral_fat_index, heart_rate_bpm, pulse_wave_velocity, vascular_age
+# phase_angle, nerve_health_score, ecm_bcm_ratio
+# muscle_mass_left_arm_kg, muscle_mass_right_arm_kg
+# muscle_mass_left_leg_kg, muscle_mass_right_leg_kg, muscle_mass_torso_kg
