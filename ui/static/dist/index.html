@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Body Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #090909;
+  --s1:       #0f0f11;
+  --s2:       #141418;
+  --s3:       #1a1a1f;
+  --b1:       #222226;
+  --b2:       #2c2c32;
+  --b3:       #38383f;
+  --t1:       #eeeef2;
+  --t2:       #a0a0aa;
+  --t3:       #606068;
+  --ac:       #b8f050;   /* lime accent */
+  --ac2:      #50c8f0;   /* cyan accent */
+  --ac3:      #f0a840;   /* amber */
+  --ac4:      #f05050;   /* red */
+  --ac5:      #c850f0;   /* purple */
+  --r:        6px;
+  --r2:       10px;
+  --r3:       14px;
+  --mono:     'DM Mono', monospace;
+  --ui:       'Syne', sans-serif;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--t1); font-family: var(--ui); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* ─── Layout ─────────────────────────────────────────────── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+.sidebar {
+  width: 210px; flex-shrink: 0;
+  background: var(--s1);
+  border-right: 1px solid var(--b1);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+
+.main { flex: 1; overflow-y: auto; }
+
+/* ─── Sidebar ─────────────────────────────────────────────── */
+.logo {
+  padding: 22px 18px 18px;
+  border-bottom: 1px solid var(--b1);
+}
+.logo-eye {
+  width: 28px; height: 28px;
+  background: var(--ac); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 10px;
+}
+.logo-eye svg { width: 16px; height: 16px; }
+.logo-name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.logo-ver { font-family: var(--mono); font-size: 10px; color: var(--t3); margin-top: 1px; }
+
+.nav-group { margin-top: 8px; }
+.nav-label { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--t3); padding: 10px 18px 4px; }
+
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 18px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+  color: var(--t2);
+  border-left: 2px solid transparent;
+  transition: all .12s;
+  user-select: none;
+}
+.nav-item:hover { color: var(--t1); background: rgba(255,255,255,.03); }
+.nav-item.on { color: var(--ac); border-left-color: var(--ac); background: rgba(184,240,80,.06); }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--b3); flex-shrink: 0; }
+.nav-dot.on { background: var(--ac); box-shadow: 0 0 8px var(--ac); }
+
+.hw-section {
+  margin-top: auto;
+  border-top: 1px solid var(--b1);
+  padding: 14px 18px;
+}
+.hw-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.hw-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ac); flex-shrink: 0; box-shadow: 0 0 5px var(--ac); }
+.hw-dot.off { background: var(--b3); box-shadow: none; }
+.hw-label { font-family: var(--mono); font-size: 10px; color: var(--t3); }
+
+/* ─── Page ─────────────────────────────────────────────────── */
+.page { padding: 28px 32px; display: none; }
+.page.on { display: block; animation: fadeUp .25s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26px; }
+.page-title { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+.page-sub { font-family: var(--mono); font-size: 11px; color: var(--t3); margin-top: 3px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 16px; border-radius: var(--r); border: none;
+  font-family: var(--ui); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .12s; white-space: nowrap;
+}
+.btn-ac { background: var(--ac); color: #0a0a0b; }
+.btn-ac:hover { background: #c8f860; transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--t2); border: 1px solid var(--b2); }
+.btn-ghost:hover { color: var(--t1); border-color: var(--b3); }
+
+/* ─── Metric cards ────────────────────────────────────────── */
+.kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+.kpi {
+  background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r2); padding: 15px 16px;
+  position: relative; overflow: hidden; cursor: default;
+  transition: border-color .15s;
+}
+.kpi:hover { border-color: var(--b2); }
+.kpi-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.kpi-label { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); margin-bottom: 8px; }
+.kpi-val { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.kpi-unit { font-family: var(--mono); font-size: 11px; color: var(--t2); margin-left: 3px; font-weight: 400; }
+.kpi-delta { font-family: var(--mono); font-size: 10px; margin-top: 7px; display: flex; align-items: center; justify-content: space-between; }
+.d-up { color: var(--ac); }
+.d-dn { color: var(--ac4); }
+.d-n  { color: var(--t3); }
+
+/* ─── Charts ──────────────────────────────────────────────── */
+.charts-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.charts-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.card {
+  background: var(--s2); border: 1px solid var(--b1);
+  border-radius: var(--r2); padding: 18px;
+}
+.card-title { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--t3); margin-bottom: 2px; }
+.card-sub { font-size: 11px; color: var(--t2); margin-bottom: 14px; }
+.chart-wrap { position: relative; }
+
+svg.chart { overflow: visible; display: block; width: 100%; }
+
+/* ─── Table / timeline ────────────────────────────────────── */
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl th { font-family: var(--mono); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; color: var(--t3); padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--b1); }
+.tbl td { font-family: var(--mono); font-size: 12px; padding: 9px 10px; border-bottom: 1px solid var(--b1); color: var(--t2); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr { cursor: pointer; transition: background .1s; }
+.tbl tr:hover td { background: rgba(255,255,255,.025); }
+.tbl tr.sel td { background: rgba(184,240,80,.06); }
+
+/* ─── Session detail ──────────────────────────────────────── */
+.detail { background: var(--s2); border: 1px solid var(--b1); border-radius: var(--r3); padding: 22px; }
+.detail-hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.detail-w { font-size: 32px; font-weight: 800; letter-spacing: -.03em; }
+.detail-wu { font-family: var(--mono); font-size: 14px; color: var(--t2); }
+.detail-ts { font-family: var(--mono); font-size: 11px; color: var(--t3); }
+.detail-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.dm { background: var(--s3); border-radius: var(--r); padding: 12px; }
+.dm-label { font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--t3); }
+.dm-val { font-size: 17px; font-weight: 600; margin-top: 4px; }
+.dm-unit { font-family: var(--mono); font-size: 10px; color: var(--t2); }
+
+/* ─── Phase gauge ─────────────────────────────────────────── */
+.gauge-wrap { margin: 14px 0 0; background: var(--s3); border-radius: var(--r); padding: 14px; }
+.gauge-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.gauge-title { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--t3); }
+.gauge-rating { font-family: var(--mono); font-size: 10px; }
+.gauge-track { height: 5px; background: var(--b1); border-radius: 3px; overflow: hidden; }
+.gauge-fill { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.4,0,.2,1); }
+.gauge-labels { display: flex; justify-content: space-between; margin-top: 4px; font-family: var(--mono); font-size: 9px; color: var(--t3); }
+
+/* ─── Context / wearable chips ────────────────────────────── */
+.ctx-src { font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ac2); margin: 14px 0 6px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 20px;
+  background: var(--s3); border: 1px solid var(--b1);
+  font-family: var(--mono); font-size: 11px;
+}
+.chip-lbl { color: var(--t3); }
+.chip-val { color: var(--t1); font-weight: 500; }
+
+/* ─── AI insight ──────────────────────────────────────────── */
+.insight {
+  margin-top: 14px;
+  background: linear-gradient(135deg, rgba(184,240,80,.06), rgba(80,200,240,.04));
+  border: 1px solid rgba(184,240,80,.18);
+  border-radius: var(--r2); padding: 18px;
+}
+.insight-tag { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ac); margin-bottom: 8px; }
+.insight-body { font-size: 13px; line-height: 1.65; color: #c8c8d4; }
+.insight-sec { margin-top: 11px; }
+.insight-sec-title { font-family: var(--mono); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; color: var(--t3); margin-bottom: 4px; }
+
+/* ─── Segmental ───────────────────────────────────────────── */
+.seg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.seg-item { }
+.seg-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; color: var(--t3); letter-spacing: .06em; }
+.seg-bar { height: 3px; background: var(--b1); border-radius: 2px; margin: 4px 0 2px; overflow: hidden; }
+.seg-fill { height: 100%; border-radius: 2px; background: var(--ac2); }
+.seg-val { font-family: var(--mono); font-size: 11px; color: var(--t2); }
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--b2); border-radius: 3px; }
+
+/* ─── Bottom nav (mobile only) ────────────────────────────── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--s1);
+  border-top: 1px solid var(--b1);
+  align-items: stretch;
+  justify-content: space-around;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.bn-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer; user-select: none;
+  color: var(--t3); font-family: var(--mono);
+  font-size: 9px; letter-spacing: .05em;
+  transition: color .12s;
+  border-top: 2px solid transparent;
+  padding-top: 2px;
+}
+.bn-item:hover { color: var(--t2); }
+.bn-item.on { color: var(--ac); border-top-color: var(--ac); }
+.bn-icon { width: 20px; height: 20px; }
+
+/* ─── Responsive: history panel ──────────────────────────── */
+.hist-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ─── Mobile ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .bottom-nav { display: flex; }
+  .main { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+
+  .page { padding: 18px 16px 12px; }
+  .page-hd { margin-bottom: 18px; }
+  .page-title { font-size: 17px; }
+
+  .kpi-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi-val { font-size: 20px; }
+
+  .charts-2, .charts-3 { grid-template-columns: 1fr; gap: 10px; }
+
+  .hist-layout { grid-template-columns: 1fr; }
+  #hist-detail { margin-top: 4px; }
+
+  .detail-grid { grid-template-columns: 1fr 1fr; }
+  .detail-w { font-size: 26px; }
+
+  .seg-grid { grid-template-columns: 1fr 1fr; }
+
+  .btn { padding: 8px 13px; font-size: 12px; }
+}
+
+/* ─── Badge ───────────────────────────────────────────────── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-family: var(--mono); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.badge-scale  { background: rgba(184,240,80,.12); color: var(--ac); }
+.badge-manual { background: rgba(80,200,240,.12); color: var(--ac2); }
+.badge-import { background: rgba(96,96,104,.18); color: var(--t3); }
+
+/* ─── Spinner ─────────────────────────────────────────────── */
+.spin { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,.3); border-top-color: #000; border-radius: 50%; animation: sp .7s linear infinite; display: inline-block; }
+@keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-eye">
+        <svg viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="3" fill="#0a0a0b"/>
+          <path d="M1 8C3 4 5 2 8 2s5 2 7 6c-2 4-4 6-7 6S3 12 1 8z" stroke="#0a0a0b" stroke-width="1.5" fill="none"/>
+        </svg>
+      </div>
+      <div class="logo-name">Body Tracker</div>
+      <div class="logo-ver">v0.1 · open source</div>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">Ansichten</div>
+      <div class="nav-item on" data-view="dashboard" onclick="nav('dashboard',this)">
+        <div class="nav-dot on"></div>Dashboard
+      </div>
+      <div class="nav-item" data-view="today" onclick="nav('today',this)">
+        <div class="nav-dot"></div>Heutige Messung
+      </div>
+      <div class="nav-item" data-view="history" onclick="nav('history',this)">
+        <div class="nav-dot"></div>Verlauf
+      </div>
+      <div class="nav-item" data-view="trends" onclick="nav('trends',this)">
+        <div class="nav-dot"></div>Trends
+      </div>
+    </div>
+
+    <div class="hw-section">
+      <div class="nav-label" style="padding:0 0 6px">Hardware</div>
+      <div class="hw-item"><div class="hw-dot"></div><div class="hw-label">Withings Body Scan</div></div>
+      <div class="hw-item"><div class="hw-dot"></div><div class="hw-label">V4L2 · /dev/video0</div></div>
+      <div class="hw-item"><div class="hw-dot"></div><div class="hw-label">Oura · Wearable</div></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ── DASHBOARD ────────────────────────────────────── -->
+    <div class="page on" id="p-dashboard">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="dash-sub">Lade Daten…</div>
+        </div>
+        <button class="btn btn-ac" onclick="triggerMeasure(this)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="6" cy="6" r="2.5"/></svg>
+          Jetzt messen
+        </button>
+      </div>
+
+      <div class="kpi-row" id="kpi-row"></div>
+
+      <div class="charts-2">
+        <div class="card">
+          <div class="card-title">Gewicht</div>
+          <div class="card-sub">Letzte 90 Tage · kg</div>
+          <div class="chart-wrap"><svg class="chart" id="ch-weight" height="120"></svg></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Körperfett &amp; Muskelmasse</div>
+          <div class="card-sub">Letzte 90 Tage</div>
+          <div class="chart-wrap"><svg class="chart" id="ch-fatmuscle" height="120"></svg></div>
+        </div>
+      </div>
+
+      <div class="charts-2">
+        <div class="card">
+          <div class="card-title">Phasenwinkel</div>
+          <div class="card-sub">Zelluläre Vitalität · °</div>
+          <div class="chart-wrap"><svg class="chart" id="ch-phase" height="120"></svg></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Viszeralfett Index</div>
+          <div class="card-sub">Letzte 90 Tage</div>
+          <div class="chart-wrap"><svg class="chart" id="ch-visceral" height="120"></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TODAY ──────────────────────────────────────── -->
+    <div class="page" id="p-today">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Heutige Messung</div>
+          <div class="page-sub" id="today-sub">—</div>
+        </div>
+        <button class="btn btn-ac" onclick="triggerMeasure(this)">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="6" cy="6" r="2.5"/></svg>
+          Neu messen
+        </button>
+      </div>
+      <div id="today-detail"></div>
+    </div>
+
+    <!-- ── HISTORY ─────────────────────────────────────── -->
+    <div class="page" id="p-history">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Verlauf</div>
+          <div class="page-sub">Alle Messungen · klicke für Details</div>
+        </div>
+      </div>
+      <div class="hist-layout">
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="tbl" id="hist-table"><thead><tr>
+            <th>Datum</th><th>Gewicht</th><th>Fett %</th><th>Muskel</th><th>Phase°</th><th>Puls</th><th>Quelle</th>
+          </tr></thead><tbody id="hist-body"></tbody></table>
+        </div>
+        <div id="hist-detail"></div>
+      </div>
+    </div>
+
+    <!-- ── TRENDS ──────────────────────────────────────── -->
+    <div class="page" id="p-trends">
+      <div class="page-hd">
+        <div>
+          <div class="page-title">Trends</div>
+          <div class="page-sub">Langzeit-Analyse aller Metriken</div>
+        </div>
+      </div>
+      <div class="charts-2" id="trends-charts"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Bottom nav (mobile) -->
+<nav class="bottom-nav">
+  <div class="bn-item on" data-view="dashboard" onclick="nav('dashboard',this,true)">
+    <svg class="bn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="11" y="3" width="6" height="6" rx="1.5"/>
+      <rect x="3" y="11" width="6" height="6" rx="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5"/>
+    </svg>
+    Dashboard
+  </div>
+  <div class="bn-item" data-view="today" onclick="nav('today',this,true)">
+    <svg class="bn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2.5" fill="currentColor" stroke="none"/>
+    </svg>
+    Messung
+  </div>
+  <div class="bn-item" data-view="history" onclick="nav('history',this,true)">
+    <svg class="bn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <line x1="4" y1="6" x2="16" y2="6"/><line x1="4" y1="10" x2="16" y2="10"/><line x1="4" y1="14" x2="16" y2="14"/>
+    </svg>
+    Verlauf
+  </div>
+  <div class="bn-item" data-view="trends" onclick="nav('trends',this,true)">
+    <svg class="bn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+      <polyline points="3,14 7,9 11,11 17,5"/>
+    </svg>
+    Trends
+  </div>
+</nav>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// DATA — 90 days of realistic demo data
+// ═══════════════════════════════════════════════════════════════════
+const sessions = [];
+const now = new Date();
+for (let i = 89; i >= 0; i--) {
+  const d = new Date(now);
+  d.setDate(d.getDate() - i);
+  const p = i / 89;  // 0 = newest day, progress towards 1 = 89 days ago
+  // Trends: weight down slightly, fat down, muscle up, phase up
+  const weight     = 83.6 - (1 - p) * 1.8 + Math.sin(i * 0.43) * 0.35;
+  const fat        = 20.1 - (1 - p) * 1.6 + Math.sin(i * 0.37) * 0.28;
+  const muscle     = 61.2 + (1 - p) * 1.4 + Math.sin(i * 0.51) * 0.18;
+  const phase      = 5.72 + (1 - p) * 0.52 + Math.sin(i * 0.61) * 0.12;
+  const visceral   = 9.1  - (1 - p) * 0.8  + Math.sin(i * 0.29) * 0.2;
+  const water      = 56.8 + (1 - p) * 0.6  + Math.sin(i * 0.44) * 0.5;
+  const hr         = 63 + Math.round(Math.sin(i * 0.55) * 4);
+  const bmr        = 1815 + Math.round((1 - p) * 22);
+  sessions.push({
+    id: 90 - i,
+    date: d.toISOString(),
+    weight: +weight.toFixed(1),
+    fat:    +fat.toFixed(1),
+    muscle: +muscle.toFixed(1),
+    phase:  +phase.toFixed(2),
+    bone:   3.42,
+    water:  +water.toFixed(1),
+    visceral: +visceral.toFixed(1),
+    hr,
+    bmr,
+    vascular_age: 28,
+    nerve_score: 82,
+    ecm_bcm: 0.81,
+    seg: { larm: 3.19, rarm: 3.28, lleg: 10.08, rleg: 10.22, torso: 26.1 },
+    source: (i % 11 === 0) ? 'manual' : 'scale',
+    context: {
+      oura: {
+        sleep_score: Math.round(78 + Math.sin(i * 0.7) * 10),
+        hrv_ms:      +(48 + Math.sin(i * 0.55) * 8).toFixed(1),
+        rest_hr:     Math.round(58 + Math.sin(i * 0.4) * 4),
+        readiness:   Math.round(75 + Math.sin(i * 0.65) * 12),
+        steps:       Math.round(8200 + Math.sin(i * 0.8) * 2400),
+        deep_h:      +(1.7 + Math.sin(i * 0.5) * 0.4).toFixed(1),
+        sleep_h:     +(7.3 + Math.sin(i * 0.3) * 0.6).toFixed(1),
+      }
+    },
+    ai: {
+      summary: 'Körperkomposition verbessert sich kontinuierlich — Phasenwinkel auf neuem 30-Tage-Hoch von 6.24°. ECM/BCM-Verhältnis von 0.81 zeigt optimale Zellhydration.',
+      trends:  'Konsistenter Muskelaufbau von +14g täglich über 8 Wochen. Phasenwinkel-Verbesserung korreliert stark mit Trainingsfrequenz. Viszeralfett-Index sinkt stetig.',
+      recs:    'Wöchentliches Proteinsoll auf 158g erhöhen basierend auf aktueller Muskelsyntheserate. Eine weitere Krafteinheit pro Woche einplanen. Aktuelle Schlafqualität ist optimal.',
+    }
+  });
+}
+
+// newest first for display
+const data = sessions.slice().reverse();
+let selectedId = data[0].id;
+
+// ═══════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════
+function nav(id, el, fromBottom) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.getElementById('p-' + id).classList.add('on');
+
+  // sync sidebar
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.remove('on');
+    n.querySelector('.nav-dot').classList.remove('on');
+  });
+  const sideEl = document.querySelector(`.nav-item[data-view="${id}"]`);
+  if (sideEl) { sideEl.classList.add('on'); sideEl.querySelector('.nav-dot').classList.add('on'); }
+
+  // sync bottom nav
+  document.querySelectorAll('.bn-item').forEach(n => n.classList.remove('on'));
+  const bnEl = document.querySelector(`.bn-item[data-view="${id}"]`);
+  if (bnEl) bnEl.classList.add('on');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SVG CHART UTILITIES
+// ═══════════════════════════════════════════════════════════════════
+function makeSVGChart(svgId, datasets, opts = {}) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const W = svg.parentElement.offsetWidth || 400;
+  const H = parseInt(svg.getAttribute('height')) || 120;
+  const pad = { t: 8, r: 8, b: 22, l: 30 };
+  const cw = W - pad.l - pad.r;
+  const ch = H - pad.t - pad.b;
+  svg.setAttribute('width', W);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // Flatten all values to get global range
+  const allVals = datasets.flatMap(d => d.values.filter(v => v != null));
+  if (!allVals.length) return;
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  const range = hi - lo || 1;
+  lo -= range * .1; hi += range * .1;
+
+  const toX = i => pad.l + (i / (datasets[0].values.length - 1)) * cw;
+  const toY = v => pad.t + ch - ((v - lo) / (hi - lo)) * ch;
+
+  let html = '';
+
+  // Grid lines
+  const steps = 4;
+  for (let s = 0; s <= steps; s++) {
+    const y = pad.t + (s / steps) * ch;
+    const val = hi - (s / steps) * (hi - lo);
+    html += `<line x1="${pad.l}" y1="${y}" x2="${W - pad.r}" y2="${y}" stroke="#1e1e22" stroke-width="1"/>`;
+    html += `<text x="${pad.l - 4}" y="${y + 3}" font-family="'DM Mono',monospace" font-size="8" fill="#60606a" text-anchor="end">${val.toFixed(1)}</text>`;
+  }
+
+  // X axis labels
+  const n = datasets[0].values.length;
+  const labelStep = Math.ceil(n / 5);
+  if (datasets[0].labels) {
+    datasets[0].labels.forEach((lbl, i) => {
+      if (i % labelStep !== 0 && i !== n - 1) return;
+      html += `<text x="${toX(i)}" y="${H - 4}" font-family="'DM Mono',monospace" font-size="8" fill="#60606a" text-anchor="middle">${lbl}</text>`;
+    });
+  }
+
+  // Area + lines
+  datasets.forEach(ds => {
+    const pts = ds.values.map((v, i) => v != null ? `${toX(i)},${toY(v)}` : null).filter(Boolean);
+    if (pts.length < 2) return;
+
+    if (ds.area) {
+      const firstX = toX(0), lastX = toX(ds.values.length - 1);
+      const areaPath = `M${firstX},${pad.t + ch} L${pts[0]} ${pts.slice(1).map(p => 'L' + p).join(' ')} L${lastX},${pad.t + ch}Z`;
+      html += `<defs><linearGradient id="g${svgId}${ds.key}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${ds.color}" stop-opacity="0.25"/>
+        <stop offset="100%" stop-color="${ds.color}" stop-opacity="0.01"/>
+      </linearGradient></defs>`;
+      html += `<path d="${areaPath}" fill="url(#g${svgId}${ds.key})"/>`;
+    }
+
+    const linePath = `M${pts[0]} ${pts.slice(1).map(p => 'L' + p).join(' ')}`;
+    html += `<path d="${linePath}" fill="none" stroke="${ds.color}" stroke-width="${ds.width || 1.5}" stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+
+  // Legend
+  if (datasets.length > 1) {
+    let lx = pad.l + 4;
+    datasets.forEach(ds => {
+      html += `<line x1="${lx}" y1="${pad.t + 6}" x2="${lx + 14}" y2="${pad.t + 6}" stroke="${ds.color}" stroke-width="2"/>`;
+      html += `<text x="${lx + 18}" y="${pad.t + 9}" font-family="'DM Mono',monospace" font-size="8" fill="${ds.color}">${ds.label}</text>`;
+      lx += 60;
+    });
+  }
+
+  svg.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// KPI CARDS
+// ═══════════════════════════════════════════════════════════════════
+function fmt(v, dec = 1) { return v != null ? (+v).toFixed(dec) : '—'; }
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+function phaseColor(v) { return v >= 7 ? '#b8f050' : v >= 5 ? '#b8f050' : v >= 3 ? '#f0a840' : '#f05050'; }
+
+function renderKPI() {
+  const latest = data[0], prev = data[1];
+  const d = (a, b) => a != null && b != null ? +(a - b).toFixed(2) : null;
+
+  const sparkVals = (key) => data.slice(0, 30).reverse().map(s => s[key]);
+  function spark(vals, color) {
+    const min = Math.min(...vals), max = Math.max(...vals), range = max - min || 1;
+    const pts = vals.map((v, i) => {
+      const x = (i / (vals.length - 1)) * 68;
+      const y = 18 - ((v - min) / range) * 16;
+      return `${x},${y}`;
+    }).join(' ');
+    return `<svg width="70" height="20" style="overflow:visible"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+
+  const cards = [
+    { label: 'Gewicht', val: fmt(latest.weight), unit: 'kg', d: d(latest.weight, prev?.weight), color: '#b8f050', key: 'weight' },
+    { label: 'Körperfett', val: fmt(latest.fat), unit: '%', d: d(latest.fat, prev?.fat), color: '#f0a840', key: 'fat' },
+    { label: 'Muskelmasse', val: fmt(latest.muscle), unit: 'kg', d: d(latest.muscle, prev?.muscle), color: '#50c8f0', key: 'muscle' },
+    { label: 'Phasenwinkel', val: fmt(latest.phase, 1), unit: '°', d: d(latest.phase, prev?.phase), color: phaseColor(latest.phase), key: 'phase' },
+  ];
+
+  document.getElementById('kpi-row').innerHTML = cards.map(c => {
+    const delta = c.d;
+    const dClass = delta == null ? 'd-n' : delta > 0 ? 'd-up' : delta < 0 ? 'd-dn' : 'd-n';
+    const dSign = delta > 0 ? '+' : '';
+    const dText = delta != null ? `<span class="${dClass}">${dSign}${fmt(delta, 2)} ${c.unit}</span>` : `<span class="d-n">vs gestern</span>`;
+    return `<div class="kpi">
+      <div class="kpi-accent" style="background:${c.color}"></div>
+      <div class="kpi-label">${c.label}</div>
+      <div><span class="kpi-val" style="color:${c.color}">${c.val}</span><span class="kpi-unit">${c.unit}</span></div>
+      <div class="kpi-delta">${dText}${spark(sparkVals(c.key), c.color)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════════════
+function makeLabels(count) {
+  return data.slice(0, count).reverse().map(s => {
+    const d = new Date(s.date);
+    return `${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}`;
+  });
+}
+
+function renderCharts() {
+  const N = 90;
+  const rev = data.slice(0, N).reverse();
+  const labels = makeLabels(N);
+
+  makeSVGChart('ch-weight', [{
+    key: 'weight', values: rev.map(s => s.weight),
+    color: '#b8f050', area: true, labels
+  }]);
+
+  makeSVGChart('ch-fatmuscle', [
+    { key: 'fat',    values: rev.map(s => s.fat),    color: '#f0a840', width: 1.5, label: 'Fett %', labels },
+    { key: 'muscle', values: rev.map(s => s.muscle), color: '#50c8f0', width: 1.5, label: 'Muskel kg' },
+  ]);
+
+  makeSVGChart('ch-phase', [{
+    key: 'phase', values: rev.map(s => s.phase),
+    color: '#b8f050', area: true, labels
+  }]);
+
+  makeSVGChart('ch-visceral', [{
+    key: 'visceral', values: rev.map(s => s.visceral),
+    color: '#f05050', area: true, labels
+  }]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION DETAIL
+// ═══════════════════════════════════════════════════════════════════
+function sessionDetailHTML(s) {
+  const pc = phaseColor(s.phase);
+  const phasePct = Math.min(100, (s.phase / 10) * 100);
+  const phaseRating = s.phase >= 7 ? 'Exzellent' : s.phase >= 5 ? 'Gut' : s.phase >= 3 ? 'Ausreichend' : 'Niedrig';
+
+  const metrics = [
+    { l: 'Körperfett', v: fmt(s.fat), u: '%', c: '#f0a840' },
+    { l: 'Muskelmasse', v: fmt(s.muscle), u: 'kg', c: '#50c8f0' },
+    { l: 'Knochenmasse', v: fmt(s.bone), u: 'kg', c: '#a0a0b0' },
+    { l: 'Körperwasser', v: fmt(s.water), u: '%', c: '#50c8f0' },
+    { l: 'Viszeral-Index', v: fmt(s.visceral, 1), u: '', c: '#f05050' },
+    { l: 'Grundumsatz', v: fmt(s.bmr, 0), u: 'kcal', c: '#b8f050' },
+    { l: 'Herzfrequenz', v: String(s.hr), u: 'bpm', c: '#f05050' },
+    { l: 'Gefäßalter', v: String(s.vascular_age), u: 'J', c: '#a0a0b0' },
+    { l: 'Nerven-Score', v: String(s.nerve_score), u: '', c: '#b8f050' },
+  ].filter(m => m.v !== '—');
+
+  const seg = s.seg;
+  const segs = [
+    { l: 'Linker Arm', v: seg.larm, max: 5 },
+    { l: 'Rechter Arm', v: seg.rarm, max: 5 },
+    { l: 'Linkes Bein', v: seg.lleg, max: 15 },
+    { l: 'Rechtes Bein', v: seg.rleg, max: 15 },
+    { l: 'Torso', v: seg.torso, max: 35 },
+  ];
+
+  const ctx = s.context?.oura;
+  const ctxLabels = { sleep_score: 'Schlaf', hrv_ms: 'HRV', rest_hr: 'Ruhepuls', readiness: 'Readiness', steps: 'Schritte', deep_h: 'Tiefschlaf', sleep_h: 'Schlafdauer' };
+  const ctxUnits  = { sleep_score: '', hrv_ms: ' ms', rest_hr: ' bpm', readiness: '', steps: '', deep_h: ' h', sleep_h: ' h' };
+
+  return `<div class="detail">
+    <div class="detail-hd">
+      <div>
+        <div class="detail-ts">${fmtDate(s.date)} · ${fmtTime(s.date)}</div>
+        <div style="margin-top:4px"><span class="detail-w">${fmt(s.weight)}</span><span class="detail-wu"> kg</span></div>
+      </div>
+      <span class="badge badge-${s.source}">${s.source}</span>
+    </div>
+
+    <div class="detail-grid">
+      ${metrics.map(m => `<div class="dm">
+        <div class="dm-label">${m.l}</div>
+        <div><span class="dm-val" style="color:${m.c}">${m.v}</span><span class="dm-unit"> ${m.u}</span></div>
+      </div>`).join('')}
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge-hd">
+        <div class="gauge-title">Phasenwinkel · Zelluläre Vitalität</div>
+        <div class="gauge-rating" style="color:${pc}">${phaseRating} · ${fmt(s.phase, 1)}°</div>
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill" style="width:${phasePct}%;background:${pc}"></div>
+      </div>
+      <div class="gauge-labels"><span>0°</span><span>3°</span><span>5°</span><span>7°</span><span>10°</span></div>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="card-title" style="margin-bottom:8px">Segmentale Muskelmasse</div>
+      <div class="seg-grid">
+        ${segs.map(sg => `<div class="seg-item">
+          <div class="seg-label">${sg.l}</div>
+          <div class="seg-bar"><div class="seg-fill" style="width:${Math.min(100,(sg.v/sg.max)*100)}%"></div></div>
+          <div class="seg-val">${fmt(sg.v)} kg</div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    ${ctx ? `
+    <div class="ctx-src">◈ Oura Ring</div>
+    <div class="chip-row">
+      ${Object.entries(ctxLabels).map(([k, l]) => ctx[k] != null ? `
+        <div class="chip"><span class="chip-lbl">${l}</span><span class="chip-val">${k.includes('_h') ? fmt(ctx[k], 1) : Math.round(ctx[k])}${ctxUnits[k]}</span></div>
+      ` : '').join('')}
+    </div>` : ''}
+
+    <div class="insight">
+      <div class="insight-tag">◈ KI-Analyse · claude-sonnet-4</div>
+      <div class="insight-body">${s.ai.summary}</div>
+      <div class="insight-sec">
+        <div class="insight-sec-title">Trends</div>
+        <div class="insight-body">${s.ai.trends}</div>
+      </div>
+      <div class="insight-sec">
+        <div class="insight-sec-title">Empfehlungen</div>
+        <div class="insight-body">${s.ai.recs}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HISTORY TABLE
+// ═══════════════════════════════════════════════════════════════════
+function renderHistory() {
+  const tbody = document.getElementById('hist-body');
+  tbody.innerHTML = data.map(s => {
+    const sel = s.id === selectedId ? 'sel' : '';
+    return `<tr class="${sel}" onclick="selectSession(${s.id})">
+      <td class="d-n">${fmtDate(s.date)}</td>
+      <td style="color:#b8f050;font-weight:600">${fmt(s.weight)} kg</td>
+      <td style="color:#f0a840">${fmt(s.fat)}%</td>
+      <td style="color:#50c8f0">${fmt(s.muscle)}</td>
+      <td style="color:${phaseColor(s.phase)}">${fmt(s.phase, 1)}</td>
+      <td>${s.hr}</td>
+      <td><span class="badge badge-${s.source}">${s.source}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function selectSession(id) {
+  selectedId = id;
+  renderHistory();
+  const s = data.find(x => x.id === id);
+  if (s) document.getElementById('hist-detail').innerHTML = sessionDetailHTML(s);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TRENDS PAGE
+// ═══════════════════════════════════════════════════════════════════
+function renderTrends() {
+  const container = document.getElementById('trends-charts');
+  const metrics = [
+    { key: 'weight',   label: 'Gewicht',       unit: 'kg', color: '#b8f050' },
+    { key: 'fat',      label: 'Körperfett',     unit: '%',  color: '#f0a840' },
+    { key: 'muscle',   label: 'Muskelmasse',    unit: 'kg', color: '#50c8f0' },
+    { key: 'phase',    label: 'Phasenwinkel',   unit: '°',  color: '#b8f050' },
+    { key: 'water',    label: 'Körperwasser',   unit: '%',  color: '#50c8f0' },
+    { key: 'visceral', label: 'Viszeralfett',   unit: '',   color: '#f05050' },
+    { key: 'hr',       label: 'Herzfrequenz',   unit: 'bpm',color: '#f05050' },
+    { key: 'bmr',      label: 'Grundumsatz',    unit: 'kcal',color:'#a0a0b0' },
+  ];
+  container.innerHTML = metrics.map(m =>
+    `<div class="card">
+      <div class="card-title">${m.label}</div>
+      <div class="card-sub">Letzte 90 Tage${m.unit ? ' · ' + m.unit : ''}</div>
+      <div class="chart-wrap"><svg class="chart" id="tc-${m.key}" height="120"></svg></div>
+    </div>`
+  ).join('');
+
+  // Need to wait for DOM then render
+  setTimeout(() => {
+    const rev = data.slice(0, 90).reverse();
+    const labels = makeLabels(90);
+    metrics.forEach(m => {
+      makeSVGChart(`tc-${m.key}`, [{ key: m.key, values: rev.map(s => s[m.key]), color: m.color, area: true, labels }]);
+    });
+  }, 0);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MEASURE BUTTON
+// ═══════════════════════════════════════════════════════════════════
+function triggerMeasure(btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spin"></span> Messung läuft…';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    alert('Messung ausgelöst — bitte auf die Waage treten.\n\nIn der echten App verbindet sich das System jetzt mit der Waage.');
+  }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+function init() {
+  const latest = data[0];
+  document.getElementById('dash-sub').textContent =
+    `Letzte Messung: ${fmtDate(latest.date)} · ${fmtTime(latest.date)} · ${data.length} Datenpunkte`;
+  document.getElementById('today-sub').textContent = fmtDate(latest.date);
+  document.getElementById('today-detail').innerHTML = sessionDetailHTML(latest);
+
+  renderKPI();
+  renderHistory();
+  selectSession(selectedId);
+  renderTrends();
+
+  // Delay charts slightly to ensure layout is calculated
+  setTimeout(() => {
+    renderCharts();
+    // Re-render on resize
+    window.addEventListener('resize', renderCharts);
+  }, 50);
+}
+
+init();
+</script>
+</body>
+</html>
